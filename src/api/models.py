@@ -10,6 +10,7 @@ class Account(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     initial_balance = Column(Numeric(12, 2), nullable=False, default=0)
+    user_id = Column(Integer, nullable=True, index=True)
 
     transactions = relationship("Transaction", back_populates="account")
 

@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 import yfinance as yf
 
 from ..database import get_db
-from ..models import Investment, InvestmentInstrument
+from ..dependencies import get_current_user_id
+from ..models import Account, Investment, InvestmentInstrument
 from ..schemas import (
     InvestmentBySymbol,
     InvestmentCreate,
@@ -17,6 +18,10 @@ from ..schemas import (
 )
 
 router = APIRouter(prefix="/api/investments", tags=["investments"])
+
+
+def _user_account_ids(db: Session, user_id: int) -> list[int]:
+    return [a.id for a in db.query(Account.id).filter(Account.user_id == user_id).all()]
 
 
 def _fetch_current_price(symbol: str) -> float:
@@ -94,8 +99,10 @@ def create_instrument(data: InvestmentInstrumentCreate, db: Session = Depends(ge
 def get_investment_summary(
     account_id: Optional[int] = None,
     db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
 ):
-    query = db.query(Investment)
+    account_ids = _user_account_ids(db, user_id)
+    query = db.query(Investment).filter(Investment.source_account_id.in_(account_ids))
     if account_id is not None:
         query = query.filter(Investment.source_account_id == account_id)
     investments = query.all()
@@ -120,8 +127,10 @@ def list_by_symbol(
     is_initial: Optional[bool] = None,
     account_id: Optional[int] = None,
     db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
 ):
-    query = db.query(Investment)
+    account_ids = _user_account_ids(db, user_id)
+    query = db.query(Investment).filter(Investment.source_account_id.in_(account_ids))
     if is_initial is not None:
         query = query.filter(Investment.is_initial.is_(is_initial))
     if account_id is not None:
@@ -186,17 +195,25 @@ def list_by_symbol(
 
 
 @router.get("", response_model=list[InvestmentOut])
-def list_investments(db: Session = Depends(get_db)):
-    investments = db.query(Investment).all()
+def list_investments(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    account_ids = _user_account_ids(db, user_id)
+    investments = db.query(Investment).filter(Investment.source_account_id.in_(account_ids)).all()
     prices = _fetch_prices_for(investments)
     return [_enrich(inv, prices[inv.asset_symbol]) for inv in investments]
 
 
 @router.post("", response_model=InvestmentOut, status_code=201)
-def create_investment(data: InvestmentCreate, db: Session = Depends(get_db)):
+def create_investment(
+    data: InvestmentCreate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
     symbol = data.asset_symbol.upper()
     _upsert_instrument(db, symbol, data.asset_name, data.asset_type)
-    db.flush()  # asegura que el instrumento esté en la sesión antes de la FK
+    db.flush()
 
     inv = Investment(
         asset_symbol=symbol,
@@ -214,8 +231,16 @@ def create_investment(data: InvestmentCreate, db: Session = Depends(get_db)):
 
 
 @router.delete("/{investment_id}", status_code=204)
-def delete_investment(investment_id: int, db: Session = Depends(get_db)):
-    inv = db.query(Investment).filter(Investment.id == investment_id).first()
+def delete_investment(
+    investment_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    account_ids = _user_account_ids(db, user_id)
+    inv = db.query(Investment).filter(
+        Investment.id == investment_id,
+        Investment.source_account_id.in_(account_ids),
+    ).first()
     if not inv:
         raise HTTPException(status_code=404, detail="Investment not found")
     db.delete(inv)

@@ -6,6 +6,7 @@ from sqlalchemy import extract
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..dependencies import get_current_user_id
 from ..models import Account, Asset, Investment, Transaction
 from ..schemas import (
     CategoryBreakdown,
@@ -19,6 +20,10 @@ from ..schemas import (
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
 
+def _user_account_ids(db: Session, user_id: int) -> list[int]:
+    return [a.id for a in db.query(Account.id).filter(Account.user_id == user_id).all()]
+
+
 # Static routes must come before /{id} to avoid route conflicts
 @router.get("/summary", response_model=Summary)
 def get_summary(
@@ -26,8 +31,11 @@ def get_summary(
     year: Optional[int] = None,
     account_id: Optional[int] = None,
     db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
 ):
-    query = db.query(Transaction)
+    account_ids = _user_account_ids(db, user_id)
+
+    query = db.query(Transaction).filter(Transaction.account_id.in_(account_ids))
     if month:
         query = query.filter(extract("month", Transaction.date) == month)
     if year:
@@ -40,14 +48,17 @@ def get_summary(
     total_expenses = sum(float(t.amount) for t in transactions if not t.is_income)
 
     if account_id is not None:
-        account = db.query(Account).filter(Account.id == account_id).first()
+        account = db.query(Account).filter(Account.id == account_id, Account.user_id == user_id).first()
         initial_balance = float(account.initial_balance) if account else 0.0
         inv_query = db.query(Investment).filter(Investment.source_account_id == account_id)
         asset_query = db.query(Asset).filter(Asset.account_id == account_id)
     else:
-        initial_balance = sum(float(a.initial_balance) for a in db.query(Account).all())
-        inv_query = db.query(Investment)
-        asset_query = db.query(Asset)
+        initial_balance = sum(
+            float(a.initial_balance)
+            for a in db.query(Account).filter(Account.user_id == user_id).all()
+        )
+        inv_query = db.query(Investment).filter(Investment.source_account_id.in_(account_ids))
+        asset_query = db.query(Asset).filter(Asset.account_id.in_(account_ids))
 
     all_investments = inv_query.all()
     total_invested = sum(
@@ -83,8 +94,13 @@ def get_by_category(
     year: Optional[int] = None,
     account_id: Optional[int] = None,
     db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
 ):
-    query = db.query(Transaction).filter(Transaction.is_income.is_(False))
+    account_ids = _user_account_ids(db, user_id)
+    query = db.query(Transaction).filter(
+        Transaction.is_income.is_(False),
+        Transaction.account_id.in_(account_ids),
+    )
     if month:
         query = query.filter(extract("month", Transaction.date) == month)
     if year:
@@ -104,10 +120,13 @@ def get_by_month(
     year: Optional[int] = None,
     account_id: Optional[int] = None,
     db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
 ):
+    account_ids = _user_account_ids(db, user_id)
     target_year = year or datetime.now().year
     query = db.query(Transaction).filter(
-        extract("year", Transaction.date) == target_year
+        extract("year", Transaction.date) == target_year,
+        Transaction.account_id.in_(account_ids),
     )
     if account_id is not None:
         query = query.filter(Transaction.account_id == account_id)
@@ -140,8 +159,10 @@ def list_transactions(
     is_income: Optional[bool] = None,
     account_id: Optional[int] = None,
     db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
 ):
-    query = db.query(Transaction)
+    account_ids = _user_account_ids(db, user_id)
+    query = db.query(Transaction).filter(Transaction.account_id.in_(account_ids))
     if month:
         query = query.filter(extract("month", Transaction.date) == month)
     if year:
@@ -157,15 +178,27 @@ def list_transactions(
 
 
 @router.get("/{transaction_id}", response_model=TransactionOut)
-def get_transaction(transaction_id: int, db: Session = Depends(get_db)):
-    t = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+def get_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    account_ids = _user_account_ids(db, user_id)
+    t = db.query(Transaction).filter(
+        Transaction.id == transaction_id,
+        Transaction.account_id.in_(account_ids),
+    ).first()
     if not t:
         raise HTTPException(status_code=404, detail="Transaction not found")
     return t
 
 
 @router.post("", response_model=TransactionOut, status_code=201)
-def create_transaction(data: TransactionCreate, db: Session = Depends(get_db)):
+def create_transaction(
+    data: TransactionCreate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
     t = Transaction(**data.model_dump())
     db.add(t)
     db.commit()
@@ -175,9 +208,16 @@ def create_transaction(data: TransactionCreate, db: Session = Depends(get_db)):
 
 @router.put("/{transaction_id}", response_model=TransactionOut)
 def update_transaction(
-    transaction_id: int, data: TransactionUpdate, db: Session = Depends(get_db)
+    transaction_id: int,
+    data: TransactionUpdate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
 ):
-    t = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+    account_ids = _user_account_ids(db, user_id)
+    t = db.query(Transaction).filter(
+        Transaction.id == transaction_id,
+        Transaction.account_id.in_(account_ids),
+    ).first()
     if not t:
         raise HTTPException(status_code=404, detail="Transaction not found")
     for key, value in data.model_dump().items():
@@ -188,8 +228,16 @@ def update_transaction(
 
 
 @router.delete("/{transaction_id}", status_code=204)
-def delete_transaction(transaction_id: int, db: Session = Depends(get_db)):
-    t = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+def delete_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    account_ids = _user_account_ids(db, user_id)
+    t = db.query(Transaction).filter(
+        Transaction.id == transaction_id,
+        Transaction.account_id.in_(account_ids),
+    ).first()
     if not t:
         raise HTTPException(status_code=404, detail="Transaction not found")
     db.delete(t)
