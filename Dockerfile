@@ -9,5 +9,7 @@ RUN uv sync --frozen --no-dev
 
 COPY . .
 
+RUN chmod +x entrypoint.sh
+
 EXPOSE 8002
-CMD ["uv", "run", "python", "-m", "uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8002"]
+CMD ["./entrypoint.sh"]
