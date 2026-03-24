@@ -1,6 +1,9 @@
 run:
 	uv run python -m uvicorn src.api.app:app --reload --port 8000
 
+lint:
+	uv run ruff check src/
+
 migrate:
 	uv run python -m alembic upgrade head
 
