@@ -79,6 +79,7 @@ def _upsert_instrument(db: Session, symbol: str, name: str, asset_type: str) -> 
 
 # --- Instruments ---
 
+
 @router.get("/instruments", response_model=list[InvestmentInstrumentOut])
 def list_instruments(db: Session = Depends(get_db)):
     return db.query(InvestmentInstrument).order_by(InvestmentInstrument.symbol).all()
@@ -93,6 +94,7 @@ def create_instrument(data: InvestmentInstrumentCreate, db: Session = Depends(ge
 
 
 # --- Investments ---
+
 
 @router.get("/summary", response_model=InvestmentSummary)
 def get_investment_summary(
@@ -152,23 +154,25 @@ def list_by_symbol(
             current_value = quantity * current_price
             profit_loss = current_value - cost_basis
             profit_loss_pct = (profit_loss / cost_basis * 100) if cost_basis else 0.0
-            purchases.append(InvestmentOut(
-                id=inv.id,
-                asset_symbol=inv.asset_symbol,
-                asset_name=inv.instrument.name,
-                asset_type=inv.instrument.asset_type,
-                quantity=quantity,
-                purchase_price=purchase_price,
-                purchase_date=inv.purchase_date,
-                cost_basis=cost_basis,
-                current_price=current_price,
-                current_value=current_value,
-                profit_loss=profit_loss,
-                profit_loss_pct=round(profit_loss_pct, 2),
-                source_account_id=inv.source_account_id,
-                is_initial=inv.is_initial,
-                notes=inv.notes,
-            ))
+            purchases.append(
+                InvestmentOut(
+                    id=inv.id,
+                    asset_symbol=inv.asset_symbol,
+                    asset_name=inv.instrument.name,
+                    asset_type=inv.instrument.asset_type,
+                    quantity=quantity,
+                    purchase_price=purchase_price,
+                    purchase_date=inv.purchase_date,
+                    cost_basis=cost_basis,
+                    current_price=current_price,
+                    current_value=current_value,
+                    profit_loss=profit_loss,
+                    profit_loss_pct=round(profit_loss_pct, 2),
+                    source_account_id=inv.source_account_id,
+                    is_initial=inv.is_initial,
+                    notes=inv.notes,
+                )
+            )
 
         total_quantity = sum(p.quantity for p in purchases)
         total_cost = sum(p.cost_basis for p in purchases)
@@ -177,18 +181,20 @@ def list_by_symbol(
         total_pl = total_current_value - total_cost
         total_pl_pct = (total_pl / total_cost * 100) if total_cost else 0.0
 
-        result.append(InvestmentBySymbol(
-            asset_symbol=symbol,
-            asset_name=invs[0].instrument.name,
-            total_quantity=total_quantity,
-            avg_purchase_price=round(avg_price, 2),
-            cost_basis=total_cost,
-            current_price=current_price,
-            current_value=total_current_value,
-            profit_loss=total_pl,
-            profit_loss_pct=round(total_pl_pct, 2),
-            purchases=purchases,
-        ))
+        result.append(
+            InvestmentBySymbol(
+                asset_symbol=symbol,
+                asset_name=invs[0].instrument.name,
+                total_quantity=total_quantity,
+                avg_purchase_price=round(avg_price, 2),
+                cost_basis=total_cost,
+                current_price=current_price,
+                current_value=total_current_value,
+                profit_loss=total_pl,
+                profit_loss_pct=round(total_pl_pct, 2),
+                purchases=purchases,
+            )
+        )
 
     return result
 
@@ -236,10 +242,14 @@ def delete_investment(
     user_id: int = Depends(get_current_user_id),
 ):
     account_ids = _user_account_ids(db, user_id)
-    inv = db.query(Investment).filter(
-        Investment.id == investment_id,
-        Investment.source_account_id.in_(account_ids),
-    ).first()
+    inv = (
+        db.query(Investment)
+        .filter(
+            Investment.id == investment_id,
+            Investment.source_account_id.in_(account_ids),
+        )
+        .first()
+    )
     if not inv:
         raise HTTPException(status_code=404, detail="Investment not found")
     db.delete(inv)
