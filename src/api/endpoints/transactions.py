@@ -54,16 +54,13 @@ def get_summary(
         asset_query = db.query(Asset).filter(Asset.account_id == account_id)
     else:
         initial_balance = sum(
-            float(a.initial_balance)
-            for a in db.query(Account).filter(Account.user_id == user_id).all()
+            float(a.initial_balance) for a in db.query(Account).filter(Account.user_id == user_id).all()
         )
         inv_query = db.query(Investment).filter(Investment.source_account_id.in_(account_ids))
         asset_query = db.query(Asset).filter(Asset.account_id.in_(account_ids))
 
     all_investments = inv_query.all()
-    total_invested = sum(
-        float(i.quantity) * float(i.purchase_price) for i in all_investments if not i.is_initial
-    )
+    total_invested = sum(float(i.quantity) * float(i.purchase_price) for i in all_investments if not i.is_initial)
     total_investments_initial = sum(
         float(i.quantity) * float(i.purchase_price) for i in all_investments if i.is_initial
     )
@@ -72,7 +69,9 @@ def get_summary(
     total_assets_initial = sum(float(a.value) for a in all_assets if a.is_initial)
     total_assets_acquired = sum(float(a.value) for a in all_assets if not a.is_initial)
 
-    balance = initial_balance + total_assets_initial + total_income - total_expenses - total_invested - total_assets_acquired
+    balance = (
+        initial_balance + total_assets_initial + total_income - total_expenses - total_invested - total_assets_acquired
+    )
 
     return Summary(
         total_income=total_income,
@@ -131,9 +130,7 @@ def get_by_month(
     if account_id is not None:
         query = query.filter(Transaction.account_id == account_id)
 
-    monthly: dict[int, dict[str, float]] = {
-        i: {"income": 0.0, "expenses": 0.0} for i in range(1, 13)
-    }
+    monthly: dict[int, dict[str, float]] = {i: {"income": 0.0, "expenses": 0.0} for i in range(1, 13)}
     for t in query.all():
         month_num = t.date.month
         if t.is_income:
@@ -184,10 +181,14 @@ def get_transaction(
     user_id: int = Depends(get_current_user_id),
 ):
     account_ids = _user_account_ids(db, user_id)
-    t = db.query(Transaction).filter(
-        Transaction.id == transaction_id,
-        Transaction.account_id.in_(account_ids),
-    ).first()
+    t = (
+        db.query(Transaction)
+        .filter(
+            Transaction.id == transaction_id,
+            Transaction.account_id.in_(account_ids),
+        )
+        .first()
+    )
     if not t:
         raise HTTPException(status_code=404, detail="Transaction not found")
     return t
@@ -214,10 +215,14 @@ def update_transaction(
     user_id: int = Depends(get_current_user_id),
 ):
     account_ids = _user_account_ids(db, user_id)
-    t = db.query(Transaction).filter(
-        Transaction.id == transaction_id,
-        Transaction.account_id.in_(account_ids),
-    ).first()
+    t = (
+        db.query(Transaction)
+        .filter(
+            Transaction.id == transaction_id,
+            Transaction.account_id.in_(account_ids),
+        )
+        .first()
+    )
     if not t:
         raise HTTPException(status_code=404, detail="Transaction not found")
     for key, value in data.model_dump().items():
@@ -234,10 +239,14 @@ def delete_transaction(
     user_id: int = Depends(get_current_user_id),
 ):
     account_ids = _user_account_ids(db, user_id)
-    t = db.query(Transaction).filter(
-        Transaction.id == transaction_id,
-        Transaction.account_id.in_(account_ids),
-    ).first()
+    t = (
+        db.query(Transaction)
+        .filter(
+            Transaction.id == transaction_id,
+            Transaction.account_id.in_(account_ids),
+        )
+        .first()
+    )
     if not t:
         raise HTTPException(status_code=404, detail="Transaction not found")
     db.delete(t)

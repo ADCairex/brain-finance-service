@@ -1,9 +1,8 @@
 from typing import Optional
 
+import yfinance as yf
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-
-import yfinance as yf
 
 from ..database import get_db
 from ..dependencies import get_current_user_id
