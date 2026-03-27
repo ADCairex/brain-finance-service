@@ -180,3 +180,33 @@ class InvestmentSummary(BaseModel):
     current_value: float
     profit_loss: float
     profit_loss_pct: float
+
+
+class TransferCreate(BaseModel):
+    from_account_id: Optional[int] = None
+    to_account_id: Optional[int] = None
+    amount: float
+    date: date
+    description: Optional[str] = None
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def parse_date(cls, v):
+        if isinstance(v, str) and ("T" in v or "Z" in v):
+            return datetime.fromisoformat(v.replace("Z", "+00:00")).date()
+        return v
+
+
+class TransferUpdate(TransferCreate):
+    pass
+
+
+class TransferOut(BaseModel):
+    id: int
+    from_account_id: Optional[int]
+    to_account_id: Optional[int]
+    amount: float
+    date: date
+    description: Optional[str]
+
+    model_config = {"from_attributes": True}
