@@ -69,3 +69,17 @@ class Investment(Base):
 
     instrument = relationship("InvestmentInstrument", back_populates="purchases")
     source_account = relationship("Account")
+
+
+class Transfer(Base):
+    __tablename__ = "transfers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    from_account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
+    to_account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
+    amount = Column(Numeric(12, 2), nullable=False)
+    date = Column(Date, nullable=False)
+    description = Column(String(255), nullable=True)
+
+    from_account = relationship("Account", foreign_keys=[from_account_id])
+    to_account = relationship("Account", foreign_keys=[to_account_id])
