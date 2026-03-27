@@ -1,7 +1,7 @@
 """add transfers table
 
 Revision ID: ac2ba6ac4899
-Revises:
+Revises: 0001
 Create Date: 2026-03-27 00:00:00.000000
 
 """
@@ -14,7 +14,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "ac2ba6ac4899"
-down_revision: str | None = None
+down_revision: str | None = "0001"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
