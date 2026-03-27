@@ -93,6 +93,8 @@ class Summary(BaseModel):
     total_invested: float
     total_investments_initial: float
     total_assets_acquired: float
+    total_transfers_out: float
+    total_transfers_in: float
     initial_balance: float
     balance: float
     count: int
