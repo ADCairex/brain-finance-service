@@ -66,23 +66,18 @@ def get_summary(
     )
 
     all_assets = asset_query.all()
-    total_assets_initial = sum(float(a.value) for a in all_assets if a.is_initial)
     total_assets_acquired = sum(float(a.value) for a in all_assets if not a.is_initial)
 
-    balance = (
-        initial_balance + total_assets_initial + total_income - total_expenses - total_invested - total_assets_acquired
-    )
+    balance = initial_balance + total_income - total_expenses - total_invested - total_assets_acquired
 
     return Summary(
         total_income=total_income,
         total_expenses=total_expenses,
         total_invested=total_invested,
         total_investments_initial=total_investments_initial,
-        total_assets_initial=total_assets_initial,
         total_assets_acquired=total_assets_acquired,
         initial_balance=initial_balance,
         balance=balance,
-        balance_with_investments=balance + total_investments_initial,
         count=len(transactions),
     )
 
