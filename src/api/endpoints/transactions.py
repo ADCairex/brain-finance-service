@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..dependencies import get_current_user_id
-from ..models import Account, Asset, Investment, Transaction
+from ..models import Account, Asset, Investment, Transaction, Transfer
 from ..schemas import (
     CategoryBreakdown,
     MonthlyData,
@@ -68,7 +68,30 @@ def get_summary(
     all_assets = asset_query.all()
     total_assets_acquired = sum(float(a.value) for a in all_assets if not a.is_initial)
 
-    balance = initial_balance + total_income - total_expenses - total_invested - total_assets_acquired
+    if account_id is not None:
+        transfers_out = db.query(Transfer).filter(Transfer.from_account_id == account_id)
+        transfers_in = db.query(Transfer).filter(Transfer.to_account_id == account_id)
+        if month:
+            transfers_out = transfers_out.filter(extract("month", Transfer.date) == month)
+            transfers_in = transfers_in.filter(extract("month", Transfer.date) == month)
+        if year:
+            transfers_out = transfers_out.filter(extract("year", Transfer.date) == year)
+            transfers_in = transfers_in.filter(extract("year", Transfer.date) == year)
+        total_transfers_out = sum(float(t.amount) for t in transfers_out.all())
+        total_transfers_in = sum(float(t.amount) for t in transfers_in.all())
+        balance = (
+            initial_balance
+            + total_income
+            - total_expenses
+            - total_invested
+            - total_assets_acquired
+            - total_transfers_out
+            + total_transfers_in
+        )
+    else:
+        total_transfers_out = 0.0
+        total_transfers_in = 0.0
+        balance = initial_balance + total_income - total_expenses - total_invested - total_assets_acquired
 
     return Summary(
         total_income=total_income,
@@ -76,6 +99,8 @@ def get_summary(
         total_invested=total_invested,
         total_investments_initial=total_investments_initial,
         total_assets_acquired=total_assets_acquired,
+        total_transfers_out=total_transfers_out,
+        total_transfers_in=total_transfers_in,
         initial_balance=initial_balance,
         balance=balance,
         count=len(transactions),
