@@ -12,7 +12,14 @@ if config.config_file_name is not None:
 # Import models so autogenerate can detect changes
 from src.api.config import settings  # noqa: E402
 from src.api.database import Base  # noqa: E402
-from src.api.models import Account, Investment, Transaction, Transfer  # noqa: E402, F401
+from src.api.models import (  # noqa: E402, F401
+    Account,
+    Asset,
+    Investment,
+    InvestmentInstrument,
+    Transaction,
+    Transfer,
+)
 
 target_metadata = Base.metadata
 
