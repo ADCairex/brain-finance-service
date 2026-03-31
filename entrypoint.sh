@@ -8,7 +8,7 @@ if echo "$CURRENT" | grep -q "head"; then
   uv run alembic upgrade head
 elif echo "$CURRENT" | grep -q "none"; then
   # No alembic_version yet — check if tables already exist (legacy DB)
-  HAS_TABLES=$(python -c "
+  HAS_TABLES=$(uv run python -c "
 from src.api.config import settings
 from sqlalchemy import create_engine, inspect
 engine = create_engine(settings.database_url)
