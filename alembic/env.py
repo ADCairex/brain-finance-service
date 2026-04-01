@@ -15,6 +15,7 @@ from src.api.database import Base  # noqa: E402
 from src.api.models import (  # noqa: E402, F401
     Account,
     Asset,
+    Category,
     Investment,
     InvestmentInstrument,
     Transaction,

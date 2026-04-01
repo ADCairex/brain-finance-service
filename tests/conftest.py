@@ -45,3 +45,10 @@ def client():
 def account(client):
     r = client.post("/api/accounts", json={"name": "Cuenta principal", "initial_balance": 1000.0})
     return r.json()
+
+
+@pytest.fixture
+def categories(client):
+    """Seed default categories by calling GET /api/categories (lazy seeding)."""
+    r = client.get("/api/categories")
+    return r.json()
