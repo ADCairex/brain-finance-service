@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..dependencies import get_current_user_id
-from ..models import Account, Asset, Investment, Transaction, Transfer
+from ..models import Account, Asset, Category, Investment, Transaction, Transfer
 from ..schemas import (
     CategoryBreakdown,
     MonthlyData,
@@ -22,6 +22,19 @@ router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
 def _user_account_ids(db: Session, user_id: int) -> list[int]:
     return [a.id for a in db.query(Account.id).filter(Account.user_id == user_id).all()]
+
+
+def _validate_category(db: Session, user_id: int, category: str, is_income: bool) -> str:
+    """Validate and resolve category. Income always returns 'ingreso'."""
+    if is_income:
+        return "ingreso"
+    exists = db.query(Category.id).filter(Category.user_id == user_id, Category.name == category).first()
+    if not exists:
+        raise HTTPException(
+            status_code=400,
+            detail=f"La categoría '{category}' no existe. Creala primero.",
+        )
+    return category
 
 
 # Static routes must come before /{id} to avoid route conflicts
@@ -220,7 +233,8 @@ def create_transaction(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    t = Transaction(**data.model_dump())
+    validated_category = _validate_category(db, user_id, data.category, data.is_income)
+    t = Transaction(**{**data.model_dump(), "category": validated_category})
     db.add(t)
     db.commit()
     db.refresh(t)
@@ -245,7 +259,8 @@ def update_transaction(
     )
     if not t:
         raise HTTPException(status_code=404, detail="Transaction not found")
-    for key, value in data.model_dump().items():
+    validated_category = _validate_category(db, user_id, data.category, data.is_income)
+    for key, value in {**data.model_dump(), "category": validated_category}.items():
         setattr(t, key, value)
     db.commit()
     db.refresh(t)

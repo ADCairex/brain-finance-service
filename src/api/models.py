@@ -1,7 +1,22 @@
-from sqlalchemy import Boolean, Column, Date, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, Column, Date, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from .database import Base
+
+
+class Category(Base):
+    __tablename__ = "categories"
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_categories_user_id_name"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    name = Column(String(50), nullable=False)
+    label = Column(String(100), nullable=False)
+    emoji = Column(String(10), nullable=False)
+    color = Column(String(7), nullable=False)
+    is_default = Column(Boolean, nullable=False, default=False)
+    is_deletable = Column(Boolean, nullable=False, default=True)
+    sort_order = Column(Integer, nullable=False, default=0)
 
 
 class Account(Base):

@@ -20,7 +20,7 @@ INCOME = {
 
 
 @pytest.fixture
-def transaction(client, account):
+def transaction(client, account, categories):
     payload = {**EXPENSE, "account_id": account["id"]}
     return client.post("/api/transactions", json=payload).json()
 
@@ -36,7 +36,7 @@ def test_list_transactions_empty(client):
     assert r.json() == []
 
 
-def test_create_expense(client, account):
+def test_create_expense(client, account, categories):
     r = client.post("/api/transactions", json={**EXPENSE, "account_id": account["id"]})
     assert r.status_code == 201
     body = r.json()
@@ -45,7 +45,7 @@ def test_create_expense(client, account):
     assert "id" in body
 
 
-def test_create_income(client, account):
+def test_create_income(client, account, categories):
     r = client.post("/api/transactions", json={**INCOME, "account_id": account["id"]})
     assert r.status_code == 201
     assert r.json()["is_income"] is True
@@ -71,7 +71,7 @@ def test_update_transaction(client, account, transaction):
     assert body["amount"] == 999.0
 
 
-def test_update_transaction_not_found(client, account):
+def test_update_transaction_not_found(client, account, categories):
     r = client.put("/api/transactions/99999", json={**EXPENSE, "account_id": account["id"]})
     assert r.status_code == 404
 
@@ -92,21 +92,21 @@ def test_delete_transaction_not_found(client):
 # ---------------------------------------------------------------------------
 
 
-def test_filter_by_is_income(client, account):
+def test_filter_by_is_income(client, account, categories):
     client.post("/api/transactions", json={**EXPENSE, "account_id": account["id"]})
     client.post("/api/transactions", json={**INCOME, "account_id": account["id"]})
     r = client.get("/api/transactions?is_income=false")
     assert all(not t["is_income"] for t in r.json())
 
 
-def test_filter_by_category(client, account):
+def test_filter_by_category(client, account, categories):
     client.post("/api/transactions", json={**EXPENSE, "account_id": account["id"]})
     client.post("/api/transactions", json={**INCOME, "account_id": account["id"]})
     r = client.get("/api/transactions?category=comida")
     assert all(t["category"] == "comida" for t in r.json())
 
 
-def test_filter_by_month_year(client, account):
+def test_filter_by_month_year(client, account, categories):
     client.post("/api/transactions", json={**EXPENSE, "account_id": account["id"]})
     r = client.get("/api/transactions?month=6&year=2025")
     assert len(r.json()) == 1
@@ -128,7 +128,7 @@ def test_summary_empty(client):
     assert body["count"] == 0
 
 
-def test_summary_with_transactions(client, account):
+def test_summary_with_transactions(client, account, categories):
     client.post("/api/transactions", json={**INCOME, "account_id": account["id"]})
     client.post("/api/transactions", json={**EXPENSE, "account_id": account["id"]})
     r = client.get("/api/transactions/summary")
@@ -149,7 +149,7 @@ def test_by_category_empty(client):
     assert r.json() == []
 
 
-def test_by_category_groups_expenses(client, account):
+def test_by_category_groups_expenses(client, account, categories):
     client.post("/api/transactions", json={**EXPENSE, "account_id": account["id"]})
     client.post("/api/transactions", json={**EXPENSE, "amount": 50.0, "account_id": account["id"]})
     client.post("/api/transactions", json={**INCOME, "account_id": account["id"]})
@@ -171,7 +171,7 @@ def test_by_month_returns_12_months(client):
     assert len(r.json()) == 12
 
 
-def test_by_month_aggregates_correctly(client, account):
+def test_by_month_aggregates_correctly(client, account, categories):
     client.post("/api/transactions", json={**INCOME, "account_id": account["id"]})
     client.post("/api/transactions", json={**EXPENSE, "account_id": account["id"]})
     r = client.get("/api/transactions/by-month?year=2025")
