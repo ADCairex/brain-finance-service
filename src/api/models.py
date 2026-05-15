@@ -61,7 +61,7 @@ class Transaction(Base):
     )
 
     account = relationship("Account", back_populates="transactions")
-    source_import_candidate = relationship("StatementImportCandidate")
+    source_import_candidate = relationship("StatementImportCandidate", foreign_keys=[source_import_candidate_id])
 
 
 class StatementImportSession(Base):
