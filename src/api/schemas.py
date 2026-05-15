@@ -293,3 +293,74 @@ class TransferOut(BaseModel):
     description: Optional[str]
 
     model_config = {"from_attributes": True}
+
+
+class StatementImportSessionOut(BaseModel):
+    id: int
+    provider: str
+    account_id: int
+    status: str
+    reconciliation: "StatementImportReconciliationOut"
+    counts: "StatementImportCountsOut"
+    candidates: list["StatementImportCandidateOut"]
+
+    model_config = {"from_attributes": True}
+
+
+class StatementImportCandidateOut(BaseModel):
+    id: int
+    source_order: int
+    transaction_date: Optional[date]
+    raw_type: Optional[str]
+    description: str
+    amount: Optional[float]
+    balance_after: Optional[float]
+    classification: str
+    category_hint: Optional[str]
+    is_income: Optional[bool]
+    exclusion_reason: Optional[str]
+    validation_error: Optional[str]
+    fingerprint: Optional[str]
+    duplicate_transaction_id: Optional[int]
+    raw_text: str
+    provenance: Optional[str]
+
+    model_config = {"from_attributes": True}
+
+
+class StatementImportReconciliationOut(BaseModel):
+    status: str
+    notes: Optional[str]
+    opening_balance: Optional[float]
+    closing_balance: Optional[float]
+    statement_total_in: float
+    statement_total_out: float
+    parsed_total_in: float
+    parsed_total_out: float
+    importable_total_in: float
+    importable_total_out: float
+    excluded_total_in: float
+    excluded_total_out: float
+    invalid_total_in: float
+    invalid_total_out: float
+    expected_closing_balance: Optional[float]
+    difference: Optional[float]
+
+
+class StatementImportCountsOut(BaseModel):
+    total: int
+    importable: int
+    excluded: int
+    duplicate: int
+    invalid: int
+
+
+class StatementImportConfirmRequest(BaseModel):
+    candidate_ids: list[int]
+    acknowledge_reconciliation_warning: bool = False
+
+
+class StatementImportConfirmOut(BaseModel):
+    session_id: int
+    imported_count: int
+    transaction_ids: list[int]
