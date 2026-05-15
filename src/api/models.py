@@ -1,4 +1,16 @@
-from sqlalchemy import Boolean, Column, Date, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -41,8 +53,70 @@ class Transaction(Base):
     is_income = Column(Boolean, nullable=False, default=False)
     notes = Column(Text, nullable=True)
     account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
+    import_fingerprint = Column(String(64), nullable=True, index=True, unique=True)
+    source_import_candidate_id = Column(
+        Integer,
+        ForeignKey("statement_import_candidates.id", ondelete="SET NULL", use_alter=True),
+        nullable=True,
+    )
 
     account = relationship("Account", back_populates="transactions")
+    source_import_candidate = relationship("StatementImportCandidate")
+
+
+class StatementImportSession(Base):
+    __tablename__ = "statement_import_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True, index=True)
+    provider = Column(String(50), nullable=False, index=True)
+    source_filename = Column(String(255), nullable=True)
+    source_file_hash = Column(String(64), nullable=True, index=True)
+    status = Column(String(50), nullable=False, default="parsed")
+    statement_start_date = Column(Date, nullable=True)
+    statement_end_date = Column(Date, nullable=True)
+    opening_balance = Column(Numeric(12, 2), nullable=True)
+    closing_balance = Column(Numeric(12, 2), nullable=True)
+    statement_total_in = Column(Numeric(12, 2), nullable=True)
+    statement_total_out = Column(Numeric(12, 2), nullable=True)
+    reconciliation_status = Column(String(50), nullable=True)
+    reconciliation_notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    account = relationship("Account")
+    candidates = relationship("StatementImportCandidate", back_populates="session", cascade="all, delete-orphan")
+
+
+class StatementImportCandidate(Base):
+    __tablename__ = "statement_import_candidates"
+    __table_args__ = (
+        UniqueConstraint("session_id", "source_order", name="uq_statement_import_candidates_session_order"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(
+        Integer, ForeignKey("statement_import_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    source_order = Column(Integer, nullable=False)
+    transaction_date = Column(Date, nullable=True, index=True)
+    raw_type = Column(String(100), nullable=True)
+    description = Column(Text, nullable=False)
+    amount = Column(Numeric(12, 2), nullable=True)
+    balance_after = Column(Numeric(12, 2), nullable=True)
+    classification = Column(String(50), nullable=False)
+    category_hint = Column(String(100), nullable=True)
+    is_income = Column(Boolean, nullable=True)
+    exclusion_reason = Column(String(255), nullable=True)
+    validation_error = Column(String(255), nullable=True)
+    fingerprint = Column(String(64), nullable=True, index=True)
+    duplicate_transaction_id = Column(Integer, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True)
+    raw_text = Column(Text, nullable=False)
+    provenance = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    session = relationship("StatementImportSession", back_populates="candidates")
+    duplicate_transaction = relationship("Transaction", foreign_keys=[duplicate_transaction_id])
 
 
 class Asset(Base):
