@@ -1,4 +1,5 @@
 from .parser import StatementParser
+from .trade_republic import TradeRepublicPdfParser
 from .types import StatementProvider
 
 
@@ -18,3 +19,4 @@ class StatementParserRegistry:
 
 
 parser_registry = StatementParserRegistry()
+parser_registry.register(TradeRepublicPdfParser())
