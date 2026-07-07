@@ -18,8 +18,6 @@ from src.api.models import (  # noqa: E402, F401
     Category,
     Investment,
     InvestmentInstrument,
-    StatementImportCandidate,
-    StatementImportSession,
     Transaction,
     Transfer,
 )
