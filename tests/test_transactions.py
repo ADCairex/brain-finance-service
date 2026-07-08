@@ -51,6 +51,24 @@ def test_create_income(client, account, categories):
     assert r.json()["is_income"] is True
 
 
+def test_create_transaction_allows_missing_account(client, categories):
+    r = client.post("/api/transactions", json=EXPENSE)
+    assert r.status_code == 201
+    assert r.json()["account_id"] is None
+
+
+def test_create_transaction_rejects_unknown_account(client, categories):
+    r = client.post("/api/transactions", json={**EXPENSE, "account_id": 99999})
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Account not found"
+
+
+def test_create_transaction_rejects_account_from_another_user(client, categories, other_user_account):
+    r = client.post("/api/transactions", json={**EXPENSE, "account_id": other_user_account["id"]})
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Account not found"
+
+
 def test_get_transaction(client, transaction):
     r = client.get(f"/api/transactions/{transaction['id']}")
     assert r.status_code == 200
@@ -69,6 +87,21 @@ def test_update_transaction(client, account, transaction):
     body = r.json()
     assert body["description"] == "Actualizado"
     assert body["amount"] == 999.0
+
+
+def test_update_transaction_rejects_unknown_account(client, transaction, categories):
+    r = client.put(f"/api/transactions/{transaction['id']}", json={**EXPENSE, "account_id": 99999})
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Account not found"
+
+
+def test_update_transaction_rejects_account_from_another_user(client, transaction, categories, other_user_account):
+    r = client.put(
+        f"/api/transactions/{transaction['id']}",
+        json={**EXPENSE, "account_id": other_user_account["id"]},
+    )
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Account not found"
 
 
 def test_update_transaction_not_found(client, account, categories):
@@ -136,6 +169,18 @@ def test_summary_with_transactions(client, account, categories):
     assert body["total_income"] == 3000.0
     assert body["total_expenses"] == 150.0
     assert body["count"] == 2
+
+
+def test_summary_rejects_unknown_account_filter(client):
+    r = client.get("/api/transactions/summary?account_id=99999")
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Account not found"
+
+
+def test_summary_rejects_account_filter_from_another_user(client, other_user_account):
+    r = client.get(f"/api/transactions/summary?account_id={other_user_account['id']}")
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Account not found"
 
 
 # ---------------------------------------------------------------------------

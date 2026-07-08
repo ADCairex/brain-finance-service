@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from src.api.app import app
 from src.api.database import Base, get_db
+from src.api.models import Account
 
 TEST_DB_URL = "sqlite:///./test.db"
 USER_ID = "1"
@@ -45,6 +46,18 @@ def client():
 def account(client):
     r = client.post("/api/accounts", json={"name": "Cuenta principal", "initial_balance": 1000.0})
     return r.json()
+
+
+@pytest.fixture
+def other_user_account():
+    db = TestingSessionLocal()
+    account = Account(name="Cuenta ajena", initial_balance=500.0, user_id=999)
+    db.add(account)
+    db.commit()
+    db.refresh(account)
+    data = {"id": account.id, "name": account.name, "initial_balance": float(account.initial_balance)}
+    db.close()
+    return data
 
 
 @pytest.fixture
