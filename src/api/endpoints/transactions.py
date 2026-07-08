@@ -37,6 +37,15 @@ def _validate_category(db: Session, user_id: int, category: str, is_income: bool
     return category
 
 
+def _validate_account(db: Session, user_id: int, account_id: int | None) -> int | None:
+    if account_id is None:
+        return None
+    exists = db.query(Account.id).filter(Account.id == account_id, Account.user_id == user_id).first()
+    if not exists:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return account_id
+
+
 # Static routes must come before /{id} to avoid route conflicts
 @router.get("/summary", response_model=Summary)
 def get_summary(
@@ -47,24 +56,25 @@ def get_summary(
     user_id: int = Depends(get_current_user_id),
 ):
     account_ids = _user_account_ids(db, user_id)
+    validated_account_id = _validate_account(db, user_id, account_id)
 
     query = db.query(Transaction).filter(Transaction.account_id.in_(account_ids))
     if month:
         query = query.filter(extract("month", Transaction.date) == month)
     if year:
         query = query.filter(extract("year", Transaction.date) == year)
-    if account_id is not None:
-        query = query.filter(Transaction.account_id == account_id)
+    if validated_account_id is not None:
+        query = query.filter(Transaction.account_id == validated_account_id)
 
     transactions = query.all()
     total_income = sum(float(t.amount) for t in transactions if t.is_income)
     total_expenses = sum(float(t.amount) for t in transactions if not t.is_income)
 
-    if account_id is not None:
-        account = db.query(Account).filter(Account.id == account_id, Account.user_id == user_id).first()
-        initial_balance = float(account.initial_balance) if account else 0.0
-        inv_query = db.query(Investment).filter(Investment.source_account_id == account_id)
-        asset_query = db.query(Asset).filter(Asset.account_id == account_id)
+    if validated_account_id is not None:
+        account = db.query(Account).filter(Account.id == validated_account_id, Account.user_id == user_id).first()
+        initial_balance = float(account.initial_balance)
+        inv_query = db.query(Investment).filter(Investment.source_account_id == validated_account_id)
+        asset_query = db.query(Asset).filter(Asset.account_id == validated_account_id)
     else:
         initial_balance = sum(
             float(a.initial_balance) for a in db.query(Account).filter(Account.user_id == user_id).all()
@@ -81,9 +91,9 @@ def get_summary(
     all_assets = asset_query.all()
     total_assets_acquired = sum(float(a.value) for a in all_assets if not a.is_initial)
 
-    if account_id is not None:
-        transfers_out = db.query(Transfer).filter(Transfer.from_account_id == account_id)
-        transfers_in = db.query(Transfer).filter(Transfer.to_account_id == account_id)
+    if validated_account_id is not None:
+        transfers_out = db.query(Transfer).filter(Transfer.from_account_id == validated_account_id)
+        transfers_in = db.query(Transfer).filter(Transfer.to_account_id == validated_account_id)
         if month:
             transfers_out = transfers_out.filter(extract("month", Transfer.date) == month)
             transfers_in = transfers_in.filter(extract("month", Transfer.date) == month)
@@ -234,7 +244,8 @@ def create_transaction(
     user_id: int = Depends(get_current_user_id),
 ):
     validated_category = _validate_category(db, user_id, data.category, data.is_income)
-    t = Transaction(**{**data.model_dump(), "category": validated_category})
+    validated_account_id = _validate_account(db, user_id, data.account_id)
+    t = Transaction(**{**data.model_dump(), "category": validated_category, "account_id": validated_account_id})
     db.add(t)
     db.commit()
     db.refresh(t)
@@ -260,7 +271,12 @@ def update_transaction(
     if not t:
         raise HTTPException(status_code=404, detail="Transaction not found")
     validated_category = _validate_category(db, user_id, data.category, data.is_income)
-    for key, value in {**data.model_dump(), "category": validated_category}.items():
+    validated_account_id = _validate_account(db, user_id, data.account_id)
+    for key, value in {
+        **data.model_dump(),
+        "category": validated_category,
+        "account_id": validated_account_id,
+    }.items():
         setattr(t, key, value)
     db.commit()
     db.refresh(t)
